@@ -14,9 +14,6 @@ import datetime
 from asyncio import run, sleep , gather , ensure_future , create_task
 silence_list = []
 no_gifs = []
-
-text = "این یک متن است با یک لینک https://example.com و یک لینک دیگر https://example.org"
-clean_text = re.sub(r'https?://\S+', '', text)
 class Locks:
     def __init__(self):
         self.locks = {
@@ -737,19 +734,31 @@ async def main():
                                 print('Delete A Gif.')
                     if locks.locks["حالت ضدلینک"] == False:
                         raw_text = message.raw_text
-                        if raw_text is not None and not raw_text in admins and ("https:" in raw_text or "@" in raw_text):
-                            await message.delete_messages()
-                            await client.ban_group_member(my_group,message.author_guid)
-                            await client.send_message(my_group,"کاربر عزیز شما به علت اراسال لینک اخراج میشوید.",reply_to_message_id=msg)
-                            print('Delete A Link.')
-                    if locks.locks["حالت فروارد"] == False:
-                        if not message.author_guid in admins and 'forwarded_from' in message.to_dict().get('message').keys():
-                            await message.delete_messages()
-                            print('Delete A forwarded.')
-                    if locks.locks["قفل روبینو"] == False:
-                        if not message.raw_text in admins and message.raw_text and message.raw_text.startswith("//"):
-                            await message.delete_messages()
-                            print('Delete A PostRobino.')
+
+async def check_and_delete_links(raw_text, admins, my_group, client, message, message_author_guid):
+    if raw_text is not None and raw_text not in admins:
+        # الگوی شناسایی هر نوع لینک
+        url_pattern = r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+'
+        
+        # استفاده از re.findall برای یافتن همه‌ی لینک‌ها در متن
+        urls = re.findall(url_pattern, raw_text)
+        
+        # اگر حداقل یک لینک یافت شد، عملیات حذف پیام و اخراج کاربر انجام می‌شود
+        if urls:
+            await message.delete_messages()
+            await client.ban_group_member(my_group, message_author_guid)
+            await client.send_message(my_group, "کاربر عزیز شما به علت ارسال لینک اخراج میشوید.", reply_to_message_id=message.message_id)
+            print(f'Deleted a message containing links: {urls}')
+            await check_and_delete_links(raw_text, admins, my_group, client, message, message_author_guid)
+
+        if locks.locks["حالت فروارد"] == False:
+            if not message.author_guid in admins and 'forwarded_from' in message.to_dict().get('message').keys():
+                await message.delete_messages()
+                print('Delete A forwarded.')
+        if locks.locks["قفل روبینو"] == False:
+            if not message.raw_text in admins and message.raw_text and message.raw_text.startswith("//"):
+                await message.delete_messages()
+                print('Delete A PostRobino.')
                     
 
                     
